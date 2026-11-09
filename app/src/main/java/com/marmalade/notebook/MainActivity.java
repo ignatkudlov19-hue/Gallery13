@@ -111,17 +111,14 @@ public class MainActivity extends Activity {
                         }
                     }
                     if (acc.isEmpty()) acc.add("*/*");
-                    Intent i = new Intent(Intent.ACTION_GET_CONTENT);
+                    Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT);
                     i.addCategory(Intent.CATEGORY_OPENABLE);
-                    if (acc.size() == 1) {
-                        i.setType(acc.get(0));
-                    } else {
-                        i.setType("*/*");
-                        i.putExtra(Intent.EXTRA_MIME_TYPES, acc.toArray(new String[0]));
-                    }
+                    i.setType("*/*");
+                    i.putExtra(Intent.EXTRA_MIME_TYPES, acc.toArray(new String[0]));
                     i.putExtra(Intent.EXTRA_ALLOW_MULTIPLE,
                         p.getMode() == FileChooserParams.MODE_OPEN_MULTIPLE);
-                    startActivityForResult(Intent.createChooser(i, "Выберите файлы"), REQ_FILES);
+                    i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                    startActivityForResult(i, REQ_FILES);
                 } catch (Exception e) {
                     filePathCallback = null;
                     toast("Не удалось открыть выбор файлов: " + e.getMessage());
@@ -175,6 +172,16 @@ public class MainActivity extends Activity {
             Uri[] r = null;
             if (res == RESULT_OK && data != null) {
                 r = WebChromeClient.FileChooserParams.parseResult(res, data);
+                if (r == null || r.length == 0) {
+                    java.util.ArrayList<Uri> l = new java.util.ArrayList<>();
+                    if (data.getClipData() != null) {
+                        for (int k = 0; k < data.getClipData().getItemCount(); k++)
+                            l.add(data.getClipData().getItemAt(k).getUri());
+                    } else if (data.getData() != null) {
+                        l.add(data.getData());
+                    }
+                    if (!l.isEmpty()) r = l.toArray(new Uri[0]);
+                }
             }
             if (filePathCallback != null) filePathCallback.onReceiveValue(r);
             filePathCallback = null;
