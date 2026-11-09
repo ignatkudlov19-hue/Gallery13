@@ -73,8 +73,6 @@ public class MainActivity extends Activity {
         s.setJavaScriptEnabled(true);
         s.setDomStorageEnabled(true);
         s.setMediaPlaybackRequiresUserGesture(false);
-        s.setAllowFileAccess(false);
-        s.setAllowContentAccess(false);
 
         final WebViewAssetLoader loader = new WebViewAssetLoader.Builder()
             .setDomain(HOST)
@@ -104,13 +102,66 @@ public class MainActivity extends Activity {
                 if (filePathCallback != null) filePathCallback.onReceiveValue(null);
                 filePathCallback = cb;
                 try {
-                    Intent i = p.createIntent();
-                    i.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
-                    startActivityForResult(i, REQ_FILES);
-                } catch (ActivityNotFoundException e) {
+                    java.util.ArrayList<String> acc = new java.util.ArrayList<>();
+                    for (String a : p.getAcceptTypes()) {
+                        if (a == null) continue;
+                        for (String t : a.split(",")) {
+                            t = t.trim();
+                            if (t.contains("/")) acc.add(t);
+                        }
+                    }
+                    if (acc.isEmpty()) acc.add("*/*");
+                    Intent i = new Intent(Intent.ACTION_GET_CONTENT);
+                    i.addCategory(Intent.CATEGORY_OPENABLE);
+                    if (acc.size() == 1) {
+                        i.setType(acc.get(0));
+                    } else {
+                        i.setType("*/*");
+                        i.putExtra(Intent.EXTRA_MIME_TYPES, acc.toArray(new String[0]));
+                    }
+                    i.putExtra(Intent.EXTRA_ALLOW_MULTIPLE,
+                        p.getMode() == FileChooserParams.MODE_OPEN_MULTIPLE);
+                    startActivityForResult(Intent.createChooser(i, "Выберите файлы"), REQ_FILES);
+                } catch (Exception e) {
                     filePathCallback = null;
+                    toast("Не удалось открыть выбор файлов: " + e.getMessage());
                     return false;
                 }
+                return true;
+            }
+
+            @Override
+            public boolean onJsAlert(WebView v, String url, String msg, final android.webkit.JsResult r) {
+                new android.app.AlertDialog.Builder(MainActivity.this)
+                    .setMessage(msg)
+                    .setPositiveButton("OK", (d, w) -> r.confirm())
+                    .setOnCancelListener(d -> r.confirm())
+                    .show();
+                return true;
+            }
+
+            @Override
+            public boolean onJsConfirm(WebView v, String url, String msg, final android.webkit.JsResult r) {
+                new android.app.AlertDialog.Builder(MainActivity.this)
+                    .setMessage(msg)
+                    .setPositiveButton("OK", (d, w) -> r.confirm())
+                    .setNegativeButton("Отмена", (d, w) -> r.cancel())
+                    .setOnCancelListener(d -> r.cancel())
+                    .show();
+                return true;
+            }
+
+            @Override
+            public boolean onJsPrompt(WebView v, String url, String msg, String def,
+                                      final android.webkit.JsPromptResult r) {
+                final android.widget.EditText et = new android.widget.EditText(MainActivity.this);
+                et.setText(def);
+                new android.app.AlertDialog.Builder(MainActivity.this)
+                    .setMessage(msg).setView(et)
+                    .setPositiveButton("OK", (d, w) -> r.confirm(et.getText().toString()))
+                    .setNegativeButton("Отмена", (d, w) -> r.cancel())
+                    .setOnCancelListener(d -> r.cancel())
+                    .show();
                 return true;
             }
         });
